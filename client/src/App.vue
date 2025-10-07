@@ -10,6 +10,10 @@
 
       <article class="results" v-if="result">
         <h2>Realtime Response</h2>
+        <div v-if="result.error" class="error" role="alert">
+          <strong>Request failed:</strong>
+          <span>{{ result.error }}</span>
+        </div>
         <p v-if="loading" class="loading">Awaiting realtime response…</p>
         <p class="task">Mode: <strong>{{ taskLabel }}</strong></p>
         <pre class="text" v-if="result.text">{{ result.text }}</pre>
@@ -150,5 +154,17 @@ header p {
 .audio .hint {
   font-size: 0.85rem;
   opacity: 0.7;
+}
+
+.error {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.6);
+  background: rgba(255, 107, 107, 0.12);
+  color: #ffd7d7;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 </style>
