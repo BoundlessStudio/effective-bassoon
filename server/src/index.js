@@ -23,6 +23,18 @@ const startServer = async () => {
     limits: {
       fileSize: 10 * 1024 * 1024,
     },
+    fileFilter: (req, file, cb) => {
+      const mimetype = file.mimetype?.toLowerCase() ?? '';
+      const isAudio = mimetype.startsWith('audio/');
+
+      if (!isAudio) {
+        req.fileValidationError =
+          'Invalid file type. Please upload a supported audio format.';
+        return cb(null, false);
+      }
+
+      cb(null, true);
+    },
   });
 
   app.use(cors({ origin: CLIENT_ORIGIN }));
@@ -47,6 +59,13 @@ const startServer = async () => {
         return res.status(500).json({
           error: 'Unexpected upload error',
           details: err.message ?? 'Unknown error',
+        });
+      }
+
+      if (req.fileValidationError) {
+        return res.status(400).json({
+          error: 'Invalid track upload',
+          details: req.fileValidationError,
         });
       }
 
