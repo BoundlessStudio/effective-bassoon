@@ -143,7 +143,6 @@ async function submit() {
     }
 
     const { data } = await axios.post('/api/analyze', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 300000,
     });
 
