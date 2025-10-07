@@ -99,6 +99,7 @@ export async function analyzeTrack({ task, audioBuffer, lyricContext }) {
           const { response } = event;
           const textParts = [];
           let audioB64 = null;
+          let audioMimeType = null;
 
           for (const item of response?.output ?? []) {
             for (const content of item?.content ?? []) {
@@ -107,6 +108,11 @@ export async function analyzeTrack({ task, audioBuffer, lyricContext }) {
               }
               if (content.type === 'audio') {
                 audioB64 = content.audio?.data ?? audioB64;
+                if (content.audio?.mime_type) {
+                  audioMimeType = content.audio.mime_type;
+                } else if (content.audio?.format) {
+                  audioMimeType = `audio/${content.audio.format}`;
+                }
               }
             }
           }
@@ -118,6 +124,7 @@ export async function analyzeTrack({ task, audioBuffer, lyricContext }) {
             instruction,
             text: textParts.join('\n').trim(),
             audioBase64: audioB64,
+            audioMimeType,
           });
         }
       } catch (err) {

@@ -67,8 +67,10 @@ const taskLabel = computed(() => {
 });
 
 const audioSrc = computed(() => {
-  if (!result.value?.audioBase64) return '';
-  return `data:audio/wav;base64,${result.value.audioBase64}`;
+  const base64 = result.value?.audioBase64;
+  if (!base64) return '';
+  const mime = result.value?.audioMimeType || 'audio/wav';
+  return `data:${mime};base64,${base64}`;
 });
 </script>
 
