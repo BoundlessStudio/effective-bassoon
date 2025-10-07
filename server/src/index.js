@@ -5,11 +5,7 @@ import multer from 'multer';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
 import { analyzeTrack } from './realtime.js';
-
-const app = express();
-const upload = multer({ dest: 'uploads/' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,44 +13,80 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
-app.use(cors({ origin: CLIENT_ORIGIN }));
-app.use(express.json());
+const startServer = async () => {
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  await fs.mkdir(uploadsDir, { recursive: true });
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
+  const app = express();
+  const upload = multer({
+    dest: uploadsDir,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
+  });
 
-app.post('/api/analyze', upload.single('track'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Missing track upload' });
-  }
+  app.use(cors({ origin: CLIENT_ORIGIN }));
+  app.use(express.json());
 
-  const task = req.body.task || 'analysis';
-  const lyricContext = req.body.lyricContext || '';
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
+  });
 
-  const filePath = path.join(__dirname, '..', req.file.path);
+  app.post('/api/analyze', (req, res) => {
+    upload.single('track')(req, res, async (err) => {
+      if (err instanceof multer.MulterError) {
+        const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+        return res.status(status).json({
+          error: 'Upload failed',
+          details: err.message,
+        });
+      }
 
-  try {
-    const audioBuffer = await fs.readFile(filePath);
+      if (err) {
+        console.error('Upload middleware failed', err);
+        return res.status(500).json({
+          error: 'Unexpected upload error',
+          details: err.message ?? 'Unknown error',
+        });
+      }
 
-    const result = await analyzeTrack({
-      task,
-      audioBuffer,
-      lyricContext,
+      if (!req.file) {
+        return res.status(400).json({ error: 'Missing track upload' });
+      }
+
+      const task = req.body.task || 'analysis';
+      const lyricContext = req.body.lyricContext || '';
+
+      const filePath = path.join(__dirname, '..', req.file.path);
+
+      try {
+        const audioBuffer = await fs.readFile(filePath);
+
+        const result = await analyzeTrack({
+          task,
+          audioBuffer,
+          lyricContext,
+        });
+
+        res.json(result);
+      } catch (error) {
+        console.error('Realtime analysis failed', error);
+        res.status(500).json({
+          error: 'Failed to process track with OpenAI Realtime API',
+          details: error?.message ?? 'Unknown error',
+        });
+      } finally {
+        await fs.unlink(filePath).catch(() => {});
+      }
     });
+  });
 
-    res.json(result);
-  } catch (error) {
-    console.error('Realtime analysis failed', error);
-    res.status(500).json({
-      error: 'Failed to process track with OpenAI Realtime API',
-      details: error?.message ?? 'Unknown error',
-    });
-  } finally {
-    await fs.unlink(filePath).catch(() => {});
-  }
-});
+  app.listen(PORT, () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+};
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+startServer().catch((error) => {
+  console.error('Failed to start server', error);
+  process.exit(1);
 });
