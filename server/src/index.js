@@ -7,6 +7,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeTrack } from './realtime.js';
 
+const ALLOWED_TASKS = new Set([
+  'analysis',
+  'lyrics-suggestion',
+  'lyrics-improvement',
+  'general-suggestion',
+  'sing-demo',
+]);
+const DEFAULT_TASK = 'analysis';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -73,7 +82,17 @@ const startServer = async () => {
         return res.status(400).json({ error: 'Missing track upload' });
       }
 
-      const task = req.body.task || 'analysis';
+      const rawTask = typeof req.body.task === 'string' ? req.body.task : '';
+      const normalizedTask = rawTask.trim().toLowerCase();
+
+      if (normalizedTask && !ALLOWED_TASKS.has(normalizedTask)) {
+        return res.status(400).json({
+          error: 'Invalid task selection',
+          details: `Supported tasks are: ${Array.from(ALLOWED_TASKS).join(', ')}`,
+        });
+      }
+
+      const task = normalizedTask || DEFAULT_TASK;
       const lyricContext = req.body.lyricContext || '';
 
       const filePath = path.join(__dirname, '..', req.file.path);
